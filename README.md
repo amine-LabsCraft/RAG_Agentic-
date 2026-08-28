@@ -536,6 +536,16 @@ Le [PRD](./PRD.md) décrit le parcours complet. L’état suivi dans [PROGRESS.m
 - `supabase/migrations/` : source de vérité du schéma de données.
 - `.agent/plans/` : plans d’implémentation historiques.
 
+
+## 👤 Auteur
+
+**Amine Ait Ali**  
+*Data & AI Engineer*
+
+[![GitHub](https://img.shields.io/badge/GitHub-amine--LabsCraft-181717?style=flat&logo=github)](https://github.com/amine-LabsCraft)
+[![Portfolio](https://img.shields.io/badge/Portfolio-amine--aitali--5752.netlify.app-00C7B7?style=flat&logo=netlify&logoColor=white)](https://amine-aitali-5752.netlify.app/)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Amine_Ait_Ali-0A66C2?style=flat&logo=linkedin)](https://www.linkedin.com/in/amine-data-engineer)
+
 ---
 
 Si vous contribuez au projet, gardez ce README synchronisé avec le comportement livré : mettez à jour les formats acceptés, les variables requises, les routes, les limites, la sécurité et le statut de la roadmap à chaque module ajouté.
