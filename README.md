@@ -88,6 +88,11 @@ Les instructions suivantes démarrent l’application sur :
 - API backend : `http://localhost:8000`
 - Santé de l’API : `http://localhost:8000/health`
 
+
+## Architecture
+
+![RAG Agentic Architecture](./RAG.png)
+
 ### 1. Installer les dépendances backend
 
 Depuis la racine du projet :
