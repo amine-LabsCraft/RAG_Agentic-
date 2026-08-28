@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1200" height="420" viewBox="0 0 1200 420" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="g" x1="0" x2="1">
+      <stop offset="0" stop-color="#4f46e5"/>
+      <stop offset="1" stop-color="#06b6d4"/>
+    </linearGradient>
+    <style>
+      .bg { fill: url(#g); }
+      .title { font-family: 'Segoe UI', Roboto, Arial; font-size: 44px; fill: #fff; font-weight:700 }
+      .subtitle { font-family: 'Segoe UI', Roboto, Arial; font-size:18px; fill: #e6f7fb }
+      .box { fill:#fff; opacity:0.95; stroke:rgba(0,0,0,0.06); stroke-width:1 }
+      .box-text { font-family: 'Segoe UI', Roboto, Arial; font-size:14px; fill:#0f172a }
+    </style>
+  </defs>
+  <rect width="1200" height="420" rx="20" class="bg" />
+  <g transform="translate(60,40)">
+    <text class="title">RAG_Agentic — Vue d'ensemble</text>
+    <text y="60" class="subtitle">Retrieval-Augmented Generation app · FastAPI · React · Supabase · OpenAI/OpenRouter</text>
+
+    <!-- Boxes representing components -->
+    <g transform="translate(0,120)">
+      <rect x="0" y="0" width="320" height="150" rx="12" class="box" />
+      <text x="20" y="28" class="box-text">Frontend</text>
+      <text x="20" y="52" class="box-text">React • Vite • Tailwind • shadcn/ui</text>
+
+      <rect x="420" y="0" width="360" height="150" rx="12" class="box" />
+      <text x="440" y="28" class="box-text">Backend</text>
+      <text x="440" y="52" class="box-text">Python • FastAPI • SSE streaming</text>
+
+      <rect x="820" y="0" width="320" height="150" rx="12" class="box" />
+      <text x="840" y="28" class="box-text">Database / Index</text>
+      <text x="840" y="52" class="box-text">Supabase (Postgres + pgvector, Auth, Storage)</text>
+    </g>
+
+    <g transform="translate(220,300)">
+      <rect x="0" y="0" width="760" height="80" rx="10" class="box" />
+      <text x="20" y="28" class="box-text">Pipelines</text>
+      <text x="20" y="52" class="box-text">Upload → Extraction → Embeddings → Stockage → Recherche</text>
+    </g>
+
+  </g>
+</svg>
