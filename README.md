@@ -6,6 +6,16 @@ Le projet est pensé comme un support de masterclass, mais il forme aussi une ba
 
 > **État actuel : modules 1 et 2 terminés.** Les formats actuellement pris en charge sont uniquement `.txt` et `.md`. Les fonctionnalités citées dans le PRD telles que PDF/DOCX, recherche hybride, reranking, Text-to-SQL, recherche web, sous-agents et déploiement sont prévues pour les modules suivants ; elles ne sont pas encore implémentées.
 
+
+
+## 🏗️ Architecture
+
+<p align="center">
+  <img src="./RAG.png" alt="RAG Agentic Architecture" width="900"/>
+</p>
+
+
+
 ## Sommaire
 
 - [Ce que fait l’application](#ce-que-fait-lapplication)
@@ -89,11 +99,6 @@ Les instructions suivantes démarrent l’application sur :
 - Santé de l’API : `http://localhost:8000/health`
 
 
-## 🏗️ Architecture
-
-<p align="center">
-  <img src="./RAG.png" alt="RAG Agentic Architecture" width="900"/>
-</p>
 
 ### 1. Installer les dépendances backend
 
