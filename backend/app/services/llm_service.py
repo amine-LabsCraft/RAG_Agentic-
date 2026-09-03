@@ -124,8 +124,22 @@ async def astream_chat_response(
             if finish_reason == "tool_calls":
                 yield {"type": "tool_calls", "tool_calls": list(tool_calls_buffer.values())}
 
-            if finish_reason == "stop":
+            elif finish_reason in ("stop", "length", "content_filter", "content-filter"):
+                # 'length' (max tokens), 'content_filter', or provider-specific
+                # stops still carry a usable partial/full response — save it.
                 yield {"type": "response_completed", "content": full_response}
+
+            elif finish_reason is not None:
+                # Unknown finish reasons (incl. OpenRouter returning None then
+                # ending the stream): treat as completed to avoid hanging.
+                yield {"type": "response_completed", "content": full_response}
+
+        # Stream ended without an explicit finish reason (happens with some
+        # OpenRouter models): emit a terminal event so callers don't loop.
+        if tool_calls_buffer:
+            yield {"type": "tool_calls", "tool_calls": list(tool_calls_buffer.values())}
+        else:
+            yield {"type": "response_completed", "content": full_response}
 
     except HTTPException:
         raise

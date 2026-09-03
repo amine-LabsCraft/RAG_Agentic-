@@ -3,13 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { Lock, Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { UserMenu } from '@/components/UserMenu'
+import { AppLayout } from '@/components/layout/AppLayout'
 import { useAuth } from '@/hooks/useAuth'
 import { getSettings, updateSettings, type GlobalSettings, type GlobalSettingsUpdate } from '@/lib/api'
-import logoSvg from '/logo.svg'
 
 export function SettingsPage() {
-  const { user, signOut, isAdmin, loading: authLoading } = useAuth()
+  const { isAdmin, loading: authLoading } = useAuth()
   const navigate = useNavigate()
 
   const [loading, setLoading] = useState(true)
@@ -66,6 +65,13 @@ export function SettingsPage() {
     setSaving(true)
     setError(null)
     setSuccess(false)
+    const dimsTrimmed = embeddingDimensions.trim()
+    const dimsParsed = dimsTrimmed ? Number.parseInt(dimsTrimmed, 10) : null
+    if (dimsTrimmed && (dimsParsed === null || Number.isNaN(dimsParsed) || dimsParsed <= 0)) {
+      setError('Dimensions must be a positive number (e.g. 1536).')
+      setSaving(false)
+      return
+    }
     try {
       const update: GlobalSettingsUpdate = {
         llm_model: llmModel || null,
@@ -74,7 +80,7 @@ export function SettingsPage() {
         embedding_model: embeddingModel || null,
         embedding_base_url: embeddingBaseUrl || null,
         embedding_api_key: embeddingApiKey || null,
-        embedding_dimensions: embeddingDimensions ? parseInt(embeddingDimensions, 10) : null,
+        embedding_dimensions: dimsParsed,
       }
       await updateSettings(update)
       setSuccess(true)
@@ -82,14 +88,6 @@ export function SettingsPage() {
       setError(err instanceof Error ? err.message : 'Failed to save settings')
     } finally {
       setSaving(false)
-    }
-  }
-
-  const handleSignOut = async () => {
-    try {
-      await signOut()
-    } catch (error) {
-      console.error('Failed to sign out:', error)
     }
   }
 
@@ -107,38 +105,9 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="flex h-screen">
-      {/* Sidebar */}
-      <div className="flex w-64 flex-col border-r bg-muted/30">
-        <div className="border-b p-4">
-          <img src={logoSvg} alt="Logo" className="h-8" />
-        </div>
-        <nav className="border-b p-2">
-          <div className="flex gap-1">
-            <button
-              onClick={() => navigate('/')}
-              className="flex-1 px-3 py-1.5 rounded-md text-sm hover:bg-muted transition-colors"
-            >
-              Chat
-            </button>
-            <button
-              onClick={() => navigate('/documents')}
-              className="flex-1 px-3 py-1.5 rounded-md text-sm hover:bg-muted transition-colors"
-            >
-              Documents
-            </button>
-          </div>
-        </nav>
-        <div className="flex-1" />
-        <div className="border-t p-2">
-          {user?.email && (
-            <UserMenu email={user.email} onSignOut={handleSignOut} isAdmin={isAdmin} />
-          )}
-        </div>
-      </div>
-
+    <AppLayout>
       {/* Main content */}
-      <div className="flex-1 overflow-auto">
+      <div className="h-full overflow-auto">
         <div className="max-w-lg mx-auto p-8">
           <h1 className="text-2xl font-bold mb-6">Settings</h1>
 
@@ -302,6 +271,6 @@ export function SettingsPage() {
           )}
         </div>
       </div>
-    </div>
+    </AppLayout>
   )
 }

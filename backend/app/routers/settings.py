@@ -15,7 +15,13 @@ def get_fernet() -> Fernet | None:
     key = get_app_settings().settings_encryption_key
     if not key:
         return None
-    return Fernet(key.encode())
+    try:
+        return Fernet(key.encode())
+    except Exception as e:
+        raise ValueError(
+            "SETTINGS_ENCRYPTION_KEY is invalid: must be a URL-safe base64-encoded 32-byte key. "
+            f"Generate one with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\" ({e})"
+        )
 
 
 def encrypt_value(value: str | None) -> str | None:
@@ -93,8 +99,8 @@ def get_global_settings_row() -> dict | None:
 
 
 @router.get("", response_model=GlobalSettingsResponse)
-async def get_settings(current_user: User = Depends(get_current_user)):
-    """Get global settings with masked API keys."""
+async def get_settings(current_user: User = Depends(get_admin_user)):
+    """Get global settings with masked API keys. Admin only."""
     data = get_global_settings_row()
     has_chunks = system_has_chunks()
 
@@ -181,12 +187,26 @@ async def update_settings(
             has_chunks=has_chunks,
         )
 
-    # Get the existing row ID
+    # Get the existing row ID (or create it if missing — e.g. fresh DB
+    # where the seed migration hasn't run).
     existing = get_global_settings_row()
     if not existing:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Global settings row not found"
+        created = supabase.table("global_settings").insert(update_data).execute()
+        if not created.data:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to save settings"
+            )
+        saved = created.data[0]
+        return GlobalSettingsResponse(
+            llm_model=saved.get("llm_model"),
+            llm_base_url=saved.get("llm_base_url"),
+            llm_api_key=mask_api_key(decrypt_value(saved.get("llm_api_key"))),
+            embedding_model=saved.get("embedding_model"),
+            embedding_base_url=saved.get("embedding_base_url"),
+            embedding_api_key=mask_api_key(decrypt_value(saved.get("embedding_api_key"))),
+            embedding_dimensions=saved.get("embedding_dimensions"),
+            has_chunks=has_chunks,
         )
 
     result = supabase.table("global_settings").update(

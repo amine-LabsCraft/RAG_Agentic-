@@ -1,29 +1,24 @@
 import { useState, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Send } from 'lucide-react'
 import { ThreadList, ThreadListRef } from '@/components/chat/ThreadList'
 import { ChatView } from '@/components/chat/ChatView'
-import { UserMenu } from '@/components/UserMenu'
+import { AppLayout } from '@/components/layout/AppLayout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { useAuth } from '@/hooks/useAuth'
 import { createThread } from '@/lib/api'
-import logoSvg from '/logo.svg'
 
 export function ChatPage() {
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null)
   const [initialMessage, setInitialMessage] = useState<string | undefined>(undefined)
   const [welcomeInput, setWelcomeInput] = useState('')
   const [creating, setCreating] = useState(false)
-  const { signOut, user, isAdmin } = useAuth()
   const threadListRef = useRef<ThreadListRef>(null)
-  const navigate = useNavigate()
 
   const handleThreadTitleUpdate = (threadId: string, title: string) => {
     threadListRef.current?.updateThreadTitle(threadId, title)
   }
 
-  const handleSelectThread = (threadId: string) => {
+  const handleSelectThread = (threadId: string | null) => {
     setSelectedThreadId(threadId)
     setInitialMessage(undefined)
   }
@@ -47,48 +42,18 @@ export function ChatPage() {
     }
   }
 
-  const handleSignOut = async () => {
-    try {
-      await signOut()
-    } catch (error) {
-      console.error('Failed to sign out:', error)
-    }
-  }
-
   return (
-    <div className="flex h-screen">
-      {/* Sidebar */}
-      <div className="flex w-64 flex-col border-r bg-muted/30">
-        <div className="border-b p-4">
-          <img src={logoSvg} alt="Logo" className="h-8" />
-        </div>
-        <nav className="border-b p-2">
-          <div className="flex gap-1">
-            <button className="flex-1 px-3 py-1.5 rounded-md text-sm bg-muted font-medium">
-              Chat
-            </button>
-            <button
-              onClick={() => navigate('/documents')}
-              className="flex-1 px-3 py-1.5 rounded-md text-sm hover:bg-muted transition-colors"
-            >
-              Documents
-            </button>
-          </div>
-        </nav>
+    <AppLayout
+      sidebar={
         <ThreadList
           ref={threadListRef}
           selectedThreadId={selectedThreadId}
           onSelectThread={handleSelectThread}
         />
-        <div className="border-t p-2">
-          {user?.email && (
-            <UserMenu email={user.email} onSignOut={handleSignOut} isAdmin={isAdmin} />
-          )}
-        </div>
-      </div>
-
+      }
+    >
       {/* Main content */}
-      <div className="flex-1">
+      <div className="flex h-full min-h-0 flex-1 flex-col">
         {selectedThreadId ? (
           <ChatView
             threadId={selectedThreadId}
@@ -120,6 +85,6 @@ export function ChatPage() {
           </div>
         )}
       </div>
-    </div>
+    </AppLayout>
   )
 }

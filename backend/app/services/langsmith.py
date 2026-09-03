@@ -36,10 +36,11 @@ def get_traced_openai_client(base_url: str | None = None, api_key: str | None = 
 
     Args:
         base_url: Optional base URL for the API (e.g., OpenRouter, Ollama)
-        api_key: Optional API key (falls back to openai_api_key)
+        api_key: Optional API key (must be provided by caller via global settings)
     """
-    effective_key = api_key or settings.openai_api_key
-    client = OpenAI(api_key=effective_key, base_url=base_url or None)
+    if not api_key:
+        raise ValueError("API key is required (no default configured).")
+    client = OpenAI(api_key=api_key, base_url=base_url or None)
 
     if settings.langsmith_api_key:
         wrapped = wrap_openai(client)
@@ -55,10 +56,11 @@ def get_traced_async_openai_client(base_url: str | None = None, api_key: str | N
 
     Args:
         base_url: Optional base URL for the API (e.g., OpenRouter, Ollama)
-        api_key: Optional API key (falls back to openai_api_key)
+        api_key: Optional API key (must be provided by caller via global settings)
     """
-    effective_key = api_key or settings.openai_api_key
-    client = AsyncOpenAI(api_key=effective_key, base_url=base_url or None)
+    if not api_key:
+        raise ValueError("API key is required (no default configured).")
+    client = AsyncOpenAI(api_key=api_key, base_url=base_url or None)
 
     if settings.langsmith_api_key:
         wrapped = wrap_openai(client)

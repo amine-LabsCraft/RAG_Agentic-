@@ -32,9 +32,18 @@ npm-debug.log*
 
 # Testing
 coverage/
+.coverage
 .pytest_cache/
+playwright-report/
+test-results/
+.playwright-mcp/
+*.sqlite
+*.sqlite3
+
+# TypeScript / Vite
+*.tsbuildinfo
+frontend/dist-ssr/
 
 # Misc
 *.bak
 *.tmp
-nul

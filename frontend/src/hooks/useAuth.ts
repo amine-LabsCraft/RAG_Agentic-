@@ -30,20 +30,23 @@ export function useAuth() {
   }
 
   useEffect(() => {
+    let cancelled = false
     // Get initial session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (cancelled) return
       setSession(session)
       setUser(session?.user ?? null)
       if (session?.access_token) {
         await fetchAdminStatus(session.access_token)
       }
-      setLoading(false)
+      if (!cancelled) setLoading(false)
     })
 
     // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (cancelled) return
       setSession(session)
       setUser(session?.user ?? null)
       if (session?.access_token) {
@@ -51,10 +54,13 @@ export function useAuth() {
       } else {
         setIsAdmin(false)
       }
-      setLoading(false)
+      if (!cancelled) setLoading(false)
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      cancelled = true
+      subscription.unsubscribe()
+    }
   }, [])
 
   const signIn = async (email: string, password: string) => {

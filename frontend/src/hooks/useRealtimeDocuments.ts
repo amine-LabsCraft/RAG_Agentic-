@@ -8,7 +8,10 @@ export function useRealtimeDocuments(userId: string | undefined) {
   const [loading, setLoading] = useState(true)
 
   const fetchDocuments = useCallback(async () => {
-    if (!userId) return
+    if (!userId) {
+      setLoading(false)
+      return
+    }
     try {
       const docs = await listDocuments()
       setDocuments(docs)
@@ -21,13 +24,16 @@ export function useRealtimeDocuments(userId: string | undefined) {
 
   useEffect(() => {
     fetchDocuments()
-  }, [fetchDocuments])
+    if (!userId) {
+      setDocuments([])
+    }
+  }, [fetchDocuments, userId])
 
   useEffect(() => {
     if (!userId) return
 
     const channel = supabase
-      .channel('documents-changes')
+      .channel(`documents-changes-${userId}`)
       .on(
         'postgres_changes',
         {
@@ -54,7 +60,11 @@ export function useRealtimeDocuments(userId: string | undefined) {
           }
         }
       )
-      .subscribe()
+      .subscribe((status, err) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('Realtime documents subscription failed:', status, err)
+        }
+      })
 
     return () => {
       supabase.removeChannel(channel)

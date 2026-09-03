@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button'
-import { deleteDocument } from '@/lib/api'
+import { deleteDocument, reprocessDocument } from '@/lib/api'
 import type { Document } from '@/types'
 import { useState } from 'react'
 
@@ -31,6 +31,7 @@ function formatFileSize(bytes: number): string {
 
 export function DocumentList({ documents, loading }: DocumentListProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [reprocessingId, setReprocessingId] = useState<string | null>(null)
 
   const handleDelete = async (doc: Document) => {
     if (!confirm(`Delete "${doc.filename}"? This cannot be undone.`)) return
@@ -42,6 +43,17 @@ export function DocumentList({ documents, loading }: DocumentListProps) {
       console.error('Failed to delete document:', error)
     } finally {
       setDeletingId(null)
+    }
+  }
+
+  const handleReprocess = async (doc: Document) => {
+    setReprocessingId(doc.id)
+    try {
+      await reprocessDocument(doc.id)
+    } catch (error) {
+      console.error('Failed to reprocess document:', error)
+    } finally {
+      setReprocessingId(null)
     }
   }
 
@@ -85,15 +97,27 @@ export function DocumentList({ documents, loading }: DocumentListProps) {
               )}
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleDelete(doc)}
-            disabled={deletingId === doc.id}
-            className="text-muted-foreground hover:text-destructive"
-          >
-            {deletingId === doc.id ? '...' : 'Delete'}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleReprocess(doc)}
+              disabled={reprocessingId === doc.id || doc.status === 'processing' || doc.status === 'pending'}
+              className="text-muted-foreground"
+              title="Re-run ingestion"
+            >
+              {reprocessingId === doc.id ? '...' : 'Reprocess'}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleDelete(doc)}
+              disabled={deletingId === doc.id}
+              className="text-muted-foreground hover:text-destructive"
+            >
+              {deletingId === doc.id ? '...' : 'Delete'}
+            </Button>
+          </div>
         </div>
       ))}
     </div>

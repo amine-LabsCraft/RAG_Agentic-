@@ -48,9 +48,18 @@ async def get_embeddings(texts: list[str], user_id: str | None = None) -> list[l
         api_key=emb_settings["api_key"],
     )
 
-    response = await client.embeddings.create(
-        model=model,
-        input=texts,
-        dimensions=dimensions,
-    )
+    kwargs: dict = {"model": model, "input": texts}
+    # Only send dimensions when configured; some providers reject it.
+    if dimensions:
+        kwargs["dimensions"] = dimensions
+    try:
+        response = await client.embeddings.create(**kwargs)
+    except Exception as e:
+        # Retry without dimensions for providers that don't support the param
+        # (Ollama, Cohere, many OpenRouter models).
+        msg = str(e).lower()
+        if dimensions and ("dimension" in msg or "unsupported" in msg or "unexpected" in msg or "400" in msg):
+            response = await client.embeddings.create(model=model, input=texts)
+        else:
+            raise
     return [item.embedding for item in response.data]

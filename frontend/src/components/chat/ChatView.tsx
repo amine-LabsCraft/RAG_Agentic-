@@ -22,11 +22,24 @@ export function ChatView({ threadId, onThreadTitleUpdate, initialMessage }: Chat
   const [streamingContent, setStreamingContent] = useState('')
   const [error, setError] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const stickToBottomRef = useRef(true)
   const abortControllerRef = useRef<AbortController | null>(null)
   const initialMessageSentRef = useRef(false)
+  const messagesRef = useRef<Message[]>([])
+  messagesRef.current = messages
+
+  const handleScroll = () => {
+    const el = scrollContainerRef.current
+    if (!el) return
+    // Stay pinned only if the user was already near the bottom (<120px)
+    stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120
+  }
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (stickToBottomRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'auto' })
+    }
   }
 
   useEffect(() => {
@@ -60,9 +73,9 @@ export function ChatView({ threadId, onThreadTitleUpdate, initialMessage }: Chat
   }, [threadId])
 
   const doSend = useCallback(async (userMessage: string) => {
-    if (!userMessage.trim() || sending) return
+    if (!userMessage.trim() || abortControllerRef.current) return
 
-    const isFirstMessage = messages.length === 0
+    const isFirstMessage = messagesRef.current.length === 0
     setSending(true)
     setWaiting(true)
     setStreamingContent('')
@@ -104,6 +117,8 @@ export function ChatView({ threadId, onThreadTitleUpdate, initialMessage }: Chat
           setSending(false)
           setWaiting(false)
           abortControllerRef.current = null
+          // Reconcile optimistic temp ids with server state
+          getMessages(threadId).then(setMessages).catch(() => {})
         },
         onError: (err) => {
           console.error('Stream error:', err)
@@ -126,7 +141,7 @@ export function ChatView({ threadId, onThreadTitleUpdate, initialMessage }: Chat
       }
       abortControllerRef.current = null
     }
-  }, [messages.length, onThreadTitleUpdate, sending, threadId])
+  }, [onThreadTitleUpdate, threadId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -152,18 +167,23 @@ export function ChatView({ threadId, onThreadTitleUpdate, initialMessage }: Chat
 
   useEffect(() => {
     if (!sending && streamingContent) {
-      setMessages(prev => [
-        ...prev,
-        {
-          id: `assistant-${Date.now()}`,
-          thread_id: threadId,
-          user_id: '',
-          role: 'assistant',
-          content: streamingContent,
-          created_at: new Date().toISOString(),
-        } as Message,
-      ])
+      const content = streamingContent
       setStreamingContent('')
+      // Pull server state (has real ids); fall back to optimistic append
+      // if refetch fails (e.g. offline).
+      getMessages(threadId).then(setMessages).catch(() => {
+        setMessages(prev => [
+          ...prev,
+          {
+            id: `assistant-${Date.now()}`,
+            thread_id: threadId,
+            user_id: '',
+            role: 'assistant',
+            content,
+            created_at: new Date().toISOString(),
+          } as Message,
+        ])
+      })
     }
   }, [sending, streamingContent, threadId])
 
@@ -178,7 +198,7 @@ export function ChatView({ threadId, onThreadTitleUpdate, initialMessage }: Chat
   return (
     <div className="flex h-full flex-col">
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto">
+      <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto">
         {messages.length === 0 && !streamingContent && !waiting && !error ? (
           <div className="flex h-full items-center justify-center">
             <div className="text-center text-muted-foreground">
@@ -255,6 +275,7 @@ export function ChatView({ threadId, onThreadTitleUpdate, initialMessage }: Chat
                 className="rounded-full"
                 onClick={handleStop}
                 title="Stop generating"
+                aria-label="Stop generating"
               >
                 <Square className="h-4 w-4" />
               </Button>
@@ -264,6 +285,7 @@ export function ChatView({ threadId, onThreadTitleUpdate, initialMessage }: Chat
                 size="icon"
                 className="rounded-full"
                 disabled={!input.trim()}
+                aria-label="Send message"
               >
                 <Send className="h-4 w-4" />
               </Button>

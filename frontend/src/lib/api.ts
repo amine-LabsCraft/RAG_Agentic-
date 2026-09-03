@@ -36,8 +36,8 @@ async function fetchApi<T>(
 }
 
 // Thread API
-export async function listThreads(): Promise<Thread[]> {
-  return fetchApi<Thread[]>('/threads')
+export async function listThreads(limit = 50, offset = 0): Promise<Thread[]> {
+  return fetchApi<Thread[]>(`/threads?limit=${limit}&offset=${offset}`)
 }
 
 export async function createThread(title?: string): Promise<Thread> {
@@ -72,8 +72,8 @@ export async function deleteThread(threadId: string): Promise<void> {
 }
 
 // Messages API
-export async function getMessages(threadId: string): Promise<Message[]> {
-  return fetchApi<Message[]>(`/threads/${threadId}/messages`)
+export async function getMessages(threadId: string, limit = 100, offset = 0): Promise<Message[]> {
+  return fetchApi<Message[]>(`/threads/${threadId}/messages?limit=${limit}&offset=${offset}`)
 }
 
 export interface SendMessageOptions {
@@ -115,6 +115,7 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
 
   const decoder = new TextDecoder()
   let buffer = ''
+  let currentEvent = ''
 
   try {
     for (;;) {
@@ -122,35 +123,51 @@ export async function sendMessage(options: SendMessageOptions): Promise<void> {
       if (done) break
 
       const chunk = decoder.decode(value, { stream: true })
-      console.log('[SSE] Chunk received:', chunk.length, 'bytes at', Date.now())
       buffer += chunk
+      // Normalize CRLF so the parser works on all platforms/browsers
+      buffer = buffer.replace(/\r\n/g, '\n')
       const lines = buffer.split('\n')
       buffer = lines.pop() || ''
 
       for (const line of lines) {
         if (line.startsWith('event: ')) {
-          const eventType = line.slice(7).trim()
-          if (eventType === 'done') {
+          currentEvent = line.slice(7).trim()
+          if (currentEvent === 'done') {
             onDone()
+            return
+          }
+          if (currentEvent === 'error') {
+            // error payload follows in data: lines; handled below
           }
           continue
         }
         if (line.startsWith('data: ')) {
           const data = line.slice(6)
+          if (data.trim() === '[DONE]') {
+            onDone()
+            return
+          }
           try {
             const parsed = JSON.parse(data)
+            if (currentEvent === 'error' || parsed.error) {
+              onError(parsed.error || 'Stream error')
+              return
+            }
             if (parsed.content) {
               onTextDelta(parsed.content)
             }
-            if (parsed.error) {
-              onError(parsed.error)
-            }
           } catch {
-            // Ignore parse errors
+            // Ignore parse errors (keep-alive comments, partial frames)
           }
+        }
+        // Blank line ends an SSE event block
+        if (line === '') {
+          currentEvent = ''
         }
       }
     }
+    // Stream closed without explicit done (some gateways strip it)
+    onDone()
   } finally {
     reader.releaseLock()
   }
@@ -182,8 +199,8 @@ export async function uploadDocument(file: File): Promise<Document> {
   return response.json()
 }
 
-export async function listDocuments(): Promise<Document[]> {
-  return fetchApi<Document[]>('/documents')
+export async function listDocuments(limit = 50, offset = 0): Promise<Document[]> {
+  return fetchApi<Document[]>(`/documents?limit=${limit}&offset=${offset}`)
 }
 
 export async function deleteDocument(documentId: string): Promise<void> {
@@ -197,6 +214,12 @@ export async function deleteDocument(documentId: string): Promise<void> {
     const error = await response.json().catch(() => ({ detail: 'Delete failed' }))
     throw new Error(error.detail || 'Delete failed')
   }
+}
+
+export async function reprocessDocument(documentId: string): Promise<{ status: string }> {
+  return fetchApi<{ status: string }>(`/documents/${documentId}/reprocess`, {
+    method: 'POST',
+  })
 }
 
 // Settings API

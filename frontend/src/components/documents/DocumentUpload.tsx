@@ -4,7 +4,9 @@ import { uploadDocument } from '@/lib/api'
 const ALLOWED_EXTENSIONS = ['.txt', '.md']
 
 function validateFile(file: File): string | null {
-  const ext = '.' + file.name.split('.').pop()?.toLowerCase()
+  const name = file.name || ''
+  const dot = name.lastIndexOf('.')
+  const ext = dot >= 0 ? name.slice(dot).toLowerCase() : ''
   if (!ALLOWED_EXTENSIONS.includes(ext)) {
     return `Unsupported file type. Allowed: ${ALLOWED_EXTENSIONS.join(', ')}`
   }
@@ -22,9 +24,11 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
 
   const handleUpload = useCallback(async (files: FileList | File[]) => {
     setError(null)
+    setNotice(null)
     const fileArray = Array.from(files)
 
     for (const file of fileArray) {
@@ -38,7 +42,10 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
     setUploading(true)
     try {
       for (const file of fileArray) {
-        await uploadDocument(file)
+        const doc = await uploadDocument(file)
+        if ((doc as { deduplicated?: boolean }).deduplicated) {
+          setNotice(`"${file.name}" already exists — skipped duplicate.`)
+        }
       }
       onUploadComplete()
     } catch (err) {
@@ -69,6 +76,8 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       handleUpload(e.target.files)
+      // Clear so the same file can be picked again
+      e.target.value = ''
     }
   }
 
@@ -105,6 +114,9 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
 
       {error && (
         <p className="text-sm text-destructive">{error}</p>
+      )}
+      {notice && (
+        <p className="text-sm text-amber-600 dark:text-amber-400">{notice}</p>
       )}
     </div>
   )

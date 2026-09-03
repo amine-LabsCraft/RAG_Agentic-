@@ -35,6 +35,10 @@ function App() {
           path="/auth"
           element={user ? <Navigate to="/" replace /> : <AuthForm />}
         />
+        <Route
+          path="*"
+          element={user ? <Navigate to="/" replace /> : <Navigate to="/auth" replace />}
+        />
       </Routes>
     </BrowserRouter>
   )

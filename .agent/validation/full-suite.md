@@ -509,6 +509,66 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/auth/me
 
 ---
 
+#### API-41: Thread list pagination (limit/offset)
+**Steps:**
+```bash
+curl -s "http://localhost:8000/threads?limit=1&offset=0" \
+  -H "Authorization: Bearer $TOKEN1"
+curl -s -o /dev/null -w "%{http_code}" "http://localhost:8000/threads?limit=200" \
+  -H "Authorization: Bearer $TOKEN1"
+```
+**Acceptance Criteria:** First call returns at most 1 thread. Second call returns `422` (limit capped at 100).
+
+---
+
+#### API-42: Document upload deduplicates identical content
+**Steps:**
+```bash
+echo "dedup fixture content" > /tmp/dedup-test.txt
+curl -s -X POST http://localhost:8000/documents/upload \
+  -H "Authorization: Bearer $TOKEN1" \
+  -F "file=@/tmp/dedup-test.txt" > /tmp/dedup1.json
+DOC_DEDUP1=$(python3 -c "import json;print(json.load(open('/tmp/dedup1.json'))['id'])")
+curl -s -X POST http://localhost:8000/documents/upload \
+  -H "Authorization: Bearer $TOKEN1" \
+  -F "file=@/tmp/dedup-test.txt"
+```
+**Acceptance Criteria:** Second upload returns the same document id with `"deduplicated": true`. No duplicate Storage object or chunks created.
+
+---
+
+#### API-43: Document reprocess requeues ingestion
+**Steps:**
+```bash
+curl -s -X POST http://localhost:8000/documents/$DOC_DEDUP1/reprocess \
+  -H "Authorization: Bearer $TOKEN1"
+curl -s http://localhost:8000/documents \
+  -H "Authorization: Bearer $TOKEN1" | python3 -c "import json,sys;print(json.load(sys.stdin)[0]['status'])"
+```
+**Acceptance Criteria:** Reprocess returns `{"status":"requeued"}`. Document status transitions to `pending`/`processing` then `completed`.
+
+---
+
+#### API-44: Messages pagination (limit/offset)
+**Steps:**
+```bash
+curl -s "http://localhost:8000/threads/$THREAD_ID/messages?limit=1&offset=0" \
+  -H "Authorization: Bearer $TOKEN1"
+```
+**Acceptance Criteria:** Returns at most 1 message, oldest first. Invalid `limit=0` returns `422`.
+
+---
+
+#### API-45: GET /settings requires admin
+**Steps:**
+```bash
+curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/settings \
+  -H "Authorization: Bearer $TOKEN_NONADMIN"
+```
+**Acceptance Criteria:** HTTP status code is `403` for non-admin users.
+
+---
+
 ## E2E Browser Tests (Playwright MCP)
 
 ### Auth Flow
@@ -806,14 +866,44 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/auth/me
 
 ---
 
+#### E2E-28: Duplicate upload shows dedup notice
+**Steps:**
+1. Navigate to Documents page
+2. Upload the same `.txt` file twice in a row
+3. `browser_wait_for` time: 3 seconds
+4. `browser_snapshot`
+**Acceptance Criteria:** Second upload shows "already exists — skipped duplicate" notice. Document list contains only one entry for that content.
+
+---
+
+#### E2E-29: Reprocess button requeues a failed document
+**Steps:**
+1. Navigate to Documents page
+2. Find a document with status `failed` (or upload then reprocess a `completed` doc)
+3. Click the "Reprocess" button
+4. `browser_wait_for` time: 5 seconds
+5. `browser_snapshot`
+**Acceptance Criteria:** Document status transitions to `pending`/`processing` (visible via Realtime update). No error toast.
+
+---
+
+#### E2E-30: Mobile layout shows hamburger menu
+**Steps:**
+1. Set viewport to mobile (e.g. 375x800)
+2. `browser_navigate` to `http://localhost:5173`
+3. `browser_snapshot`
+**Acceptance Criteria:** Top bar shows hamburger button with aria-label "Open menu". Sidebar is hidden until menu is opened. Opening the menu reveals Chat/Documents nav.
+
+---
+
 ## Cleanup
 
 After all tests pass, clean up test data:
 
 ### Cleanup-01: Delete test documents
 ```bash
-# Delete remaining test documents
-for DOC in $DOC_ID_MD $RAG_DOC_ID; do
+# Delete remaining test documents (incl. dedup fixture)
+for DOC in $DOC_ID_MD $RAG_DOC_ID $DOC_DEDUP1; do
   curl -s -X DELETE http://localhost:8000/documents/$DOC \
     -H "Authorization: Bearer $TOKEN1"
 done
@@ -852,18 +942,18 @@ curl -s http://localhost:8000/documents \
 | Section | Total | Passed | Failed | Skipped |
 |---------|-------|--------|--------|---------|
 | API: Health & Auth | 4 | | | |
-| API: Thread CRUD | 7 | | | |
+| API: Thread CRUD | 8 | | | |
 | API: Data Isolation | 4 | | | |
-| API: Chat/Messages | 4 | | | |
-| API: Documents | 11 | | | |
-| API: Settings & Admin | 7 | | | |
+| API: Chat/Messages | 5 | | | |
+| API: Documents | 13 | | | |
+| API: Settings & Admin | 8 | | | |
 | API: Error Handling | 3 | | | |
 | E2E: Auth Flow | 4 | | | |
 | E2E: Chat Flow | 5 | | | |
-| E2E: Navigation | 2 | | | |
-| E2E: Documents | 4 | | | |
+| E2E: Navigation | 3 | | | |
+| E2E: Documents | 6 | | | |
 | E2E: RAG Integration | 2 | | | |
 | E2E: Data Isolation | 5 | | | |
 | E2E: Admin Settings | 4 | | | |
 | E2E: Error Handling | 1 | | | |
-| **TOTAL** | **67** | | | |
+| **TOTAL** | **75** | | | |

@@ -62,12 +62,23 @@ Track your progress through the masterclass. Update this file as you complete mo
 ### Validation Suite
 - [x] Test fixture files created (.agent/validation/fixtures/)
 - [x] Full validation suite written (.agent/validation/full-suite.md)
-- [x] 36 API tests (curl-based) covering health, auth, threads, chat, documents, settings, errors
-- [x] 23 E2E browser tests (Playwright MCP) covering auth, chat, navigation, documents, RAG, isolation
+- [x] 45 API tests (curl-based) covering health, auth, threads, chat, documents, settings, errors, pagination, dedup, reprocess
+- [x] 30 E2E browser tests (Playwright MCP) covering auth, chat, navigation, documents, RAG, isolation, dedup, mobile layout
 - [x] Cleanup section to reset state after test runs
 - [x] CLAUDE.md updated with test suite maintenance instructions for future agents
 
 **Status: COMPLETE**
+
+### Hardening + Module 3: Record Manager (done, pending `supabase db push`)
+- [x] Backend P0: langsmith key fix, CORS parsing, traceback leak, utcnow, finish_reason, .single()->404, settings upsert, embedding dimensions fallback, tool guards, chunking bounds
+- [x] Security: GET /settings admin-only, Fernet validation at startup, filename sanitization, orphan Storage cleanup, ingestion user_id scoping
+- [x] Frontend: SSE parser (CRLF/[DONE]), ChatView reconcile + no scroll-hijack, useRealtimeDocuments fix, App 404, useAuth race, Settings dimensions guard
+- [x] Layout: shared AppLayout (desktop sidebar + mobile hamburger), Chat/Documents/Settings refactored
+- [x] Pagination: threads/documents/messages limit+offset (backend range + frontend Load more)
+- [x] Record Manager: content_hash column + migration, upload dedup (returns existing + notice), ingestion incremental skip, POST /documents/{id}/reprocess, Reprocess button in UI
+- [ ] Apply migrations: `supabase db push` (hardening_repair + record_manager_hash), then restart backend
+
+**Status: COMPLETE (code) / PENDING (db push + manual validation)**
 
 ## Notes
 - Test user created: test@test.com (see CLAUDE.md for credentials)

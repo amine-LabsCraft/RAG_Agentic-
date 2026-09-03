@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 
 interface ThreadListProps {
   selectedThreadId: string | null
-  onSelectThread: (threadId: string) => void
+  onSelectThread: (threadId: string | null) => void
 }
 
 export interface ThreadListRef {
@@ -20,6 +20,9 @@ export const ThreadList = forwardRef<ThreadListRef, ThreadListProps>(
   const [threads, setThreads] = useState<Thread[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const PAGE_SIZE = 50
 
   useImperativeHandle(ref, () => ({
     updateThreadTitle: (threadId: string, title: string) => {
@@ -34,12 +37,26 @@ export const ThreadList = forwardRef<ThreadListRef, ThreadListProps>(
 
   const loadThreads = async () => {
     try {
-      const data = await listThreads()
+      const data = await listThreads(PAGE_SIZE, 0)
       setThreads(data)
+      setHasMore(data.length === PAGE_SIZE)
     } catch (error) {
       console.error('Failed to load threads:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadMore = async () => {
+    setLoadingMore(true)
+    try {
+      const data = await listThreads(PAGE_SIZE, threads.length)
+      setThreads(prev => [...prev, ...data])
+      setHasMore(data.length === PAGE_SIZE)
+    } catch (error) {
+      console.error('Failed to load more threads:', error)
+    } finally {
+      setLoadingMore(false)
     }
   }
 
@@ -66,7 +83,7 @@ export const ThreadList = forwardRef<ThreadListRef, ThreadListProps>(
       await deleteThread(threadId)
       setThreads(prev => prev.filter(t => t.id !== threadId))
       if (selectedThreadId === threadId) {
-        onSelectThread('')
+        onSelectThread(null)
       }
     } catch (error) {
       console.error('Failed to delete thread:', error)
@@ -124,6 +141,18 @@ export const ThreadList = forwardRef<ThreadListRef, ThreadListProps>(
                 </Button>
               </div>
             ))}
+          </div>
+        )}
+        {hasMore && threads.length > 0 && (
+          <div className="p-2">
+            <Button
+              variant="ghost"
+              className="w-full text-xs"
+              disabled={loadingMore}
+              onClick={loadMore}
+            >
+              {loadingMore ? 'Loading...' : 'Load more'}
+            </Button>
           </div>
         )}
       </div>

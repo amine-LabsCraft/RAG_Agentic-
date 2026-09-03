@@ -1,7 +1,7 @@
 import json
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from starlette.responses import StreamingResponse
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.dependencies import get_current_user, User
 from app.db.supabase import get_supabase_client
@@ -14,10 +14,20 @@ router = APIRouter(prefix="/threads/{thread_id}", tags=["chat"])
 MAX_TOOL_ROUNDS = 3
 
 
+def _utcnow_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
 async def verify_thread_access(thread_id: str, user_id: str) -> dict:
     """Verify the user has access to the thread and return thread data."""
     supabase = get_supabase_client()
-    result = supabase.table("threads").select("*").eq("id", thread_id).eq("user_id", user_id).single().execute()
+    try:
+        result = supabase.table("threads").select("*").eq("id", thread_id).eq("user_id", user_id).maybe_single().execute()
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Thread not found"
+        )
 
     if not result.data:
         raise HTTPException(
@@ -48,13 +58,16 @@ def user_has_documents(user_id: str) -> bool:
 @router.get("/messages", response_model=list[MessageResponse])
 async def get_messages(
     thread_id: str,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    limit: int = Query(default=100, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
 ):
-    """Get all messages for a thread from database."""
+    """Get all messages for a thread from database (paginated, oldest first)."""
     await verify_thread_access(thread_id, current_user.id)
 
     supabase = get_supabase_client()
-    result = supabase.table("messages").select("*").eq("thread_id", thread_id).order("created_at").execute()
+    result = supabase.table("messages").select("*").eq("thread_id", thread_id).order(
+        "created_at").range(offset, offset + limit - 1).execute()
 
     return result.data
 
@@ -70,7 +83,7 @@ async def send_message(
     supabase = get_supabase_client()
 
     # Store user message in database
-    now = datetime.utcnow().isoformat()
+    now = _utcnow_iso()
     user_message_result = supabase.table("messages").insert({
         "thread_id": thread_id,
         "user_id": current_user.id,
@@ -147,12 +160,12 @@ async def send_message(
                                 "user_id": current_user.id,
                                 "role": "assistant",
                                 "content": full_response,
-                                "created_at": datetime.utcnow().isoformat(),
+                                "created_at": _utcnow_iso(),
                             }).execute()
 
                             # Update thread's updated_at
                             supabase.table("threads").update({
-                                "updated_at": datetime.utcnow().isoformat()
+                                "updated_at": _utcnow_iso()
                             }).eq("id", thread_id).execute()
 
                         yield f"event: done\ndata: {{}}\n\n"
@@ -163,15 +176,18 @@ async def send_message(
                         yield f"event: error\ndata: {data}\n\n"
                         return
 
-            # If we exhausted rounds without a final response, send done
+            # If we exhausted rounds without a final response, save + send done
             if full_response:
                 supabase.table("messages").insert({
                     "thread_id": thread_id,
                     "user_id": current_user.id,
                     "role": "assistant",
                     "content": full_response,
-                    "created_at": datetime.utcnow().isoformat(),
+                    "created_at": _utcnow_iso(),
                 }).execute()
+                supabase.table("threads").update({
+                    "updated_at": _utcnow_iso()
+                }).eq("id", thread_id).execute()
             yield f"event: done\ndata: {{}}\n\n"
 
         except Exception as e:

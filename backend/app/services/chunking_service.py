@@ -22,8 +22,15 @@ def chunk_text(
     if separators is None:
         separators = ["\n\n", "\n", ". ", " "]
 
+    if not text or not text.strip():
+        return []
+    text = text.strip()
+
+    if chunk_overlap >= chunk_size:
+        chunk_overlap = chunk_size // 5
+
     if len(text) <= chunk_size:
-        return [text.strip()] if text.strip() else []
+        return [text] if text else []
 
     # Find the best separator
     separator = separators[-1]
@@ -47,10 +54,12 @@ def chunk_text(
         else:
             if current_chunk.strip():
                 chunks.append(current_chunk.strip())
-            # Start new chunk with overlap from previous
+            # Start new chunk with overlap from previous (bounded so the
+            # new chunk stays under chunk_size).
             if chunk_overlap > 0 and current_chunk:
                 overlap_text = current_chunk[-chunk_overlap:]
-                current_chunk = overlap_text + separator + split
+                candidate = overlap_text + separator + split
+                current_chunk = candidate if len(candidate) <= chunk_size else split
             else:
                 current_chunk = split
 
@@ -64,6 +73,14 @@ def chunk_text(
     for chunk in chunks:
         if len(chunk) > chunk_size and remaining_separators:
             final_chunks.extend(chunk_text(chunk, chunk_size, chunk_overlap, remaining_separators))
+        elif len(chunk) > chunk_size:
+            # No separator left (e.g. long string without spaces): hard-split
+            # to guarantee the size bound for embedding APIs.
+            step = max(chunk_size - chunk_overlap, 1)
+            start = 0
+            while start < len(chunk):
+                final_chunks.append(chunk[start:start + chunk_size].strip())
+                start += step
         else:
             final_chunks.append(chunk)
 

@@ -1,4 +1,5 @@
 """Ingestion orchestration: download -> extract -> chunk -> embed -> store."""
+import hashlib
 import logging
 from app.db.supabase import get_supabase_client
 from app.services.chunking_service import chunk_text
@@ -18,14 +19,18 @@ async def process_document(document_id: str, user_id: str) -> None:
     supabase = get_supabase_client()
 
     try:
-        # Update status to processing
+        # Update status to processing (scoped to owner to avoid cross-user writes)
         supabase.table("documents").update({
             "status": "processing"
-        }).eq("id", document_id).execute()
+        }).eq("id", document_id).eq("user_id", user_id).execute()
 
-        # Get document record
-        doc_result = supabase.table("documents").select("*").eq("id", document_id).single().execute()
-        doc = doc_result.data
+        # Get document record (ownership enforced)
+        try:
+            doc_result = supabase.table("documents").select("*").eq(
+                "id", document_id).eq("user_id", user_id).maybe_single().execute()
+        except Exception:
+            raise ValueError(f"Document {document_id} not found")
+        doc = doc_result.data if doc_result else None
 
         if not doc:
             raise ValueError(f"Document {document_id} not found")
@@ -33,6 +38,32 @@ async def process_document(document_id: str, user_id: str) -> None:
         # Download file from storage
         storage_path = doc["storage_path"]
         file_bytes = supabase.storage.from_("documents").download(storage_path)
+        # supabase-py may return bytes or a response object
+        if not isinstance(file_bytes, (bytes, bytearray)):
+            file_bytes = getattr(file_bytes, "data", file_bytes) or getattr(file_bytes, "content", b"")
+
+        # Record Manager: hash bytes for change detection / incremental skip
+        content_hash = hashlib.sha256(bytes(file_bytes)).hexdigest()
+        try:
+            supabase.table("documents").update({
+                "content_hash": content_hash,
+            }).eq("id", document_id).execute()
+        except Exception:
+            pass  # column missing until migration applied
+
+        # Incremental shortcut: same hash already has chunks (e.g. reprocess
+        # of unchanged content) — skip embed + insert.
+        try:
+            existing_chunks = supabase.table("chunks").select(
+                "id", count="exact").eq("document_id", document_id).limit(1).execute()
+            if (existing_chunks.count or 0) > 0 and doc.get("content_hash") == content_hash:
+                supabase.table("documents").update({
+                    "status": "completed",
+                }).eq("id", document_id).execute()
+                logger.info(f"Document {document_id} unchanged (hash {content_hash[:8]}...), skipped re-embedding")
+                return
+        except Exception:
+            pass
 
         # Extract text based on file type
         text = extract_text(file_bytes, doc["file_type"])
